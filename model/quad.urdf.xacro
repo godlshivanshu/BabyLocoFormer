@@ -1,0 +1,199 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="go2_description" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:property name="PI" value="3.141592653589793" />
+  <xacro:property name="HALF_PI" value="1.5707963267948966" />
+
+  <xacro:arg name="base_len" default="0.35" />
+  <xacro:arg name="base_width" default="0.1" /> <!-- actual 0.0935 + 2 * hip_link_y_origin -->
+  <xacro:arg name="leg_len" default="0.2" /> 
+  
+  <xacro:arg name="thigh_len" default="$(arg leg_len)" />
+  <xacro:arg name="calf_len" default="$(arg leg_len)" />
+
+  <xacro:arg name="base_height" default="0.1" />
+
+  <xacro:property name="hip_x_offset" value="${$(arg base_len) / 2.0}" />
+  <xacro:property name="hip_y_offset" value="${$(arg base_width) / 2.0}" />
+  <xacro:property name="hip_link_y_origin" value="0.08" />
+  <xacro:property name="hip_link_cyl_len" value="0.04" />
+  <xacro:property name="hip_link_cyl_radius" value="0.046" />
+
+  <xacro:property name="thigh_joint_y_offset" value="0.1" />
+  <xacro:property name="thigh_cyl_radius" value="0.02" />
+  <xacro:property name="calf_cyl_radius" value="0.012" />
+  <xacro:property name="foot_sphere_radius" value="0.022" />
+  <xacro:property name="foot_x_offset" value="-0.002" />
+  <xacro:property name="imu_x" value="0" />
+  <xacro:property name="imu_y" value="0" />
+  <xacro:property name="imu_z" value="0" />
+  <xacro:property name="hip_limit_lower" value="-1." />
+  <xacro:property name="hip_limit_upper" value="1." />
+  <xacro:property name="hip_limit_effort" value="20" />
+  <xacro:property name="hip_limit_vel" value="30" />
+  <xacro:property name="front_thigh_limit_lower" value="-1.5708" />
+  <xacro:property name="front_thigh_limit_upper" value="3.4907" />
+  <xacro:property name="rear_thigh_limit_lower" value="-0.5236" />
+  <xacro:property name="rear_thigh_limit_upper" value="4.5379" />
+  <xacro:property name="thigh_limit_effort" value="20" />
+  <xacro:property name="thigh_limit_vel" value="30" />
+  <xacro:property name="calf_limit_lower" value="-2.7227" />
+  <xacro:property name="calf_limit_upper" value="-0.83776" />
+  <xacro:property name="calf_limit_effort" value="45" />
+  <xacro:property name="calf_limit_vel" value="15" />
+  
+  <material name="grey">
+    <color rgba="0.5 0.5 0.5 1.0"/>
+  </material>
+  <material name="black">
+    <color rgba="0.1 0.1 0.1 1.0"/>
+  </material>
+
+  <link name="base">
+    <xacro:property name="base_geometry">
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <box size="$(arg base_len) $(arg base_width) $(arg base_height)" />
+      </geometry>
+    </xacro:property>
+
+    <collision>
+      <xacro:insert_block name="base_geometry" />
+    </collision>
+    
+    <visual>
+      <xacro:insert_block name="base_geometry" />
+      <material name="grey"/>
+    </visual>
+  </link>
+
+  <xacro:macro name="leg" params="prefix reflect_x reflect_y thigh_lower thigh_upper">
+    
+    <link name="${prefix}_hip">
+      <xacro:property name="hip_geometry">
+        <origin rpy="${HALF_PI} 0 0" xyz="0 ${reflect_y * hip_link_y_origin} 0" />
+        <geometry>
+          <cylinder length="${hip_link_cyl_len}" radius="${hip_link_cyl_radius}" />
+        </geometry>
+      </xacro:property>
+      
+      <collision>
+        <xacro:insert_block name="hip_geometry" />
+      </collision>
+      <visual>
+        <xacro:insert_block name="hip_geometry" />
+        <material name="grey"/>
+      </visual>
+    </link>
+
+    <joint name="${prefix}_hip_joint" type="revolute">
+      <origin xyz="${reflect_x * hip_x_offset} ${reflect_y * hip_y_offset} 0" rpy="0 0 0" />
+      <parent link="base" />
+      <child link="${prefix}_hip" />
+      <axis xyz="1 0 0" />
+      <limit lower="${hip_limit_lower}" upper="${hip_limit_upper}" effort="${hip_limit_effort}" velocity="${hip_limit_vel}" />
+    </joint>
+
+
+    <link name="${prefix}_thigh">
+      <xacro:property name="thigh_geometry">
+        <origin rpy="0 0 0" xyz="0 0 -${$(arg thigh_len) / 2}" />
+        <geometry>
+          <cylinder length="$(arg thigh_len)" radius="${thigh_cyl_radius}" />
+        </geometry>
+      </xacro:property>
+      
+      <collision>
+        <xacro:insert_block name="thigh_geometry" />
+      </collision>
+      <visual>
+        <xacro:insert_block name="thigh_geometry" />
+        <material name="black"/>
+      </visual>
+    </link>
+
+    <joint name="${prefix}_thigh_joint" type="revolute">
+      <origin xyz="0 ${reflect_y * thigh_joint_y_offset} 0" rpy="0 0 0" />
+      <parent link="${prefix}_hip" />
+      <child link="${prefix}_thigh" />
+      <axis xyz="0 1 0" />
+      <limit lower="${thigh_lower}" upper="${thigh_upper}" effort="${thigh_limit_effort}" velocity="${thigh_limit_vel}" />
+    </joint>
+
+    <joint name="${prefix}_calf_joint" type="revolute">
+      <origin xyz="0 0 -$(arg thigh_len)" rpy="0 0 0" />
+      <parent link="${prefix}_thigh" />
+      <child link="${prefix}_calf" />
+      <axis xyz="0 1 0" />
+      <limit lower="${calf_limit_lower}" upper="${calf_limit_upper}" effort="${calf_limit_effort}" velocity="${calf_limit_vel}" />
+    </joint>
+
+    <link name="${prefix}_calf">
+      <xacro:property name="calf_geometry">
+        <origin xyz="0 0 -${$(arg calf_len) / 2}" rpy="0 0 0" />
+        <geometry>
+          <cylinder length="$(arg calf_len)" radius="${calf_cyl_radius}" />
+        </geometry>
+      </xacro:property>
+
+      <collision>
+        <xacro:insert_block name="calf_geometry" />
+      </collision>
+      <visual>
+        <xacro:insert_block name="calf_geometry" />
+        <material name="black"/>
+      </visual>
+    </link>
+
+    <link name="${prefix}_foot">
+      <xacro:property name="foot_geometry">
+        <origin rpy="0 0 0" xyz="${foot_x_offset} 0 0" />
+        <geometry>
+          <sphere radius="${foot_sphere_radius}" />
+        </geometry>
+      </xacro:property>
+      
+      <collision>
+        <xacro:insert_block name="foot_geometry" />
+      </collision>
+      <visual>
+        <xacro:insert_block name="foot_geometry" />
+        <material name="grey"/>
+      </visual>
+    </link>
+
+    <joint name="${prefix}_foot_joint" type="fixed" dont_collapse="true">
+      <origin xyz="0 0 -$(arg calf_len)" rpy="0 0 0" />
+      <parent link="${prefix}_calf" />
+      <child link="${prefix}_foot" />
+      <axis xyz="0 0 0" />
+    </joint>
+    
+  </xacro:macro>
+
+  <xacro:leg prefix="FL" reflect_x="1" reflect_y="1" 
+             thigh_lower="${front_thigh_limit_lower}" 
+             thigh_upper="${front_thigh_limit_upper}" />
+             
+  <xacro:leg prefix="FR" reflect_x="1" reflect_y="-1" 
+             thigh_lower="${front_thigh_limit_lower}" 
+             thigh_upper="${front_thigh_limit_upper}" />
+             
+  <xacro:leg prefix="RL" reflect_x="-1" reflect_y="1" 
+             thigh_lower="${rear_thigh_limit_lower}" 
+             thigh_upper="${rear_thigh_limit_upper}" />
+             
+  <xacro:leg prefix="RR" reflect_x="-1" reflect_y="-1" 
+             thigh_lower="${rear_thigh_limit_lower}" 
+             thigh_upper="${rear_thigh_limit_upper}" />
+
+  <link name="imu">
+  </link>
+  <joint name="imu_joint" type="fixed">
+    <origin xyz="${imu_x} ${imu_y} ${imu_z}" rpy="0 0 0" />
+    <parent link="base" />
+    <child link="imu" />
+    <axis xyz="0 0 0" />
+  </joint>
+  
+</robot>
