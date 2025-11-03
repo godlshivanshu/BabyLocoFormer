@@ -42,7 +42,7 @@ if __name__ == "__main__":
     # Define the range for each parameter
     base_len_range = np.arange(0.25, 0.45, 0.02)
     base_width_range = np.arange(0.01, 0.21, 0.02)
-    leg_len_range = np.arange(0.1, 0.3, 0.01)
+    leg_len_range = np.arange(0.15, 0.25, 0.01)
 
     # Create a list of all parameter combinations
     param_combinations = list(product(base_len_range, base_width_range, leg_len_range))

@@ -148,26 +148,25 @@ class EventCfg:
     # periodic reset of the robot state without terminating the episode
     # this is useful for continuous data collection where the robot is reset to a new state
     # without ending the MDP.
-    # periodic_cart_reset = EventTerm(
-    #     func=mdp.reset_joints_by_offset,
-    #     mode="interval",
-    #     interval_range_s=(2.0, 2.0),  # reset every 2 seconds
-    #     is_global_time=False,
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("robot", joint_names=["slider_to_cart"]),
-    #         "position_range": (-1.0, 1.0),
-    #         "velocity_range": (-0.5, 0.5),
-    #     },
-    # )
+    periodic_cart_reset = EventTerm(
+        func=mdp.reset_joints_by_offset,
+        mode="interval",
+        interval_range_s=(2.0, 2.1),  # reset every 2 seconds
+        is_global_time=False,
+        params={
+            # Apply to the quadruped's default leg joints (matching init_state patterns)
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[
+                    ".*R_hip_joint",
+                    ".*L_hip_joint",
+                    "F[L,R]_thigh_joint",
+                    "R[L,R]_thigh_joint",
+                    ".*_calf_joint",
+                ],
+            ),
+            "position_range": (-0.0, 0.0),
+            "velocity_range": (-0.0, 0.0),
+        },
+    )
 
-    # periodic_pole_reset = EventTerm(
-    #     func=mdp.reset_joints_by_offset,
-    #     mode="interval",
-    #     interval_range_s=(2.0, 2.0),   # reset every 2 seconds
-    #     is_global_time=False,
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("robot", joint_names=["cart_to_pole"]),
-    #         "position_range": (-0.25 * math.pi, 0.25 * math.pi),
-    #         "velocity_range": (-0.25 * math.pi, 0.25 * math.pi),
-    #     },
-    # )

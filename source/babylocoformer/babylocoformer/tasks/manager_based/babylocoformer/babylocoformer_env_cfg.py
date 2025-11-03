@@ -45,7 +45,7 @@ COBBLESTONE_ROAD_CFG = terrain_gen.TerrainGeneratorCfg(
     sub_terrains={
         # "flat": terrain_gen.MeshPlaneTerrainCfg(proportion=0.1),
         "random_rough": terrain_gen.HfRandomUniformTerrainCfg(
-            proportion=0.1, noise_range=(0.01, 0.04), noise_step=0.01, border_width=0.25
+            proportion=0.1, noise_range=(0.01, 0.03), noise_step=0.01, border_width=0.25
         ),
         # "hf_pyramid_slope": terrain_gen.HfPyramidSlopedTerrainCfg(
         #     proportion=0.1, slope_range=(0.0, 0.4), platform_width=2.0, border_width=0.25
@@ -116,7 +116,7 @@ class CommandsCfg:
         rel_standing_envs=0.1,
         debug_vis=True,
         ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.1, 0.1), lin_vel_y=(-0.1, 0.1), ang_vel_z=(-0.2, 0.2)
+            lin_vel_x=(-0.1, 0.1), lin_vel_y=(-0.1, 0.1), ang_vel_z=(-0.6, 0.6)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
             lin_vel_x=(-1.0, 1.0), lin_vel_y=(-0.4, 0.4), ang_vel_z=(-1.0, 1.0)
@@ -172,7 +172,7 @@ class ObservationsCfg:
         )
         joint_pos_rel = ObsTerm(func=mdp.joint_pos_rel, clip=(-100, 100))
         joint_vel_rel = ObsTerm(func=mdp.joint_vel_rel, scale=0.05, clip=(-100, 100))
-        # joint_effort = ObsTerm(func=mdp.joint_effort, scale=0.01, clip=(-100, 100))
+        joint_effort = ObsTerm(func=mdp.joint_effort, scale=0.01, clip=(-100, 100))
 
 
         def __post_init__(self):
@@ -189,7 +189,7 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # (1) Constant running reward
-    alive = RewTerm(func=mdp.is_alive, weight=1)
+    alive = RewTerm(func=mdp.is_alive, weight=5)
 
     # -- task
     track_lin_vel_xy = RewTerm(
@@ -210,19 +210,35 @@ class RewardsCfg:
 
     # -- robot
     # allow more pitch during stair ascent
-    base_height_l2 = RewTerm(func=mdp.base_height_l2,
-                             weight=-10,
-                             params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*")},)
+    # base_height_l2 = RewTerm(func=mdp.base_height_l2,
+    #                          weight=-1,
+    #                          params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*")},)
+    energy = RewTerm(func=mdp.energy, weight=-2e-5)
+    joint_vel = RewTerm(func=mdp.joint_vel_l2, weight=-0.001)
+    flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-2.5)
 
-    # joint_pos = RewTerm(
-    #     func=mdp.joint_position_penalty,
-    #     weight=-0.7,
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-    #         "stand_still_scale": 5.0,
-    #         "velocity_threshold": 0.3,
-    #     },
-    # )
+    undesired_contacts = RewTerm(
+        func=mdp.undesired_contacts,
+        weight=-1,
+        params={
+            "threshold": 1,
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*_hip", ".*_thigh", ".*_calf"]),
+        },
+    )
+    air_time_variance = RewTerm(
+        func=mdp.air_time_variance_penalty,
+        weight=-1.0,
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot")},
+    )
+    joint_pos = RewTerm(
+        func=mdp.joint_position_penalty,
+        weight=-0.5,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
+            "stand_still_scale": 5.0,
+            "velocity_threshold": 0.3,
+        },
+    )
 
 @configclass
 class TerminationsCfg:
@@ -231,7 +247,7 @@ class TerminationsCfg:
     # (1) Time out
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
 
-    bad_orientation = DoneTerm(func=mdp.bad_orientation, params={"limit_angle": 0.8})
+    bad_orientation = DoneTerm(func=mdp.bad_orientation, params={"limit_angle": 1.2})
     base_contact = DoneTerm(
         func=mdp.illegal_contact,
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names="base"), "threshold": 1.0},
@@ -241,9 +257,23 @@ class TerminationsCfg:
 @configclass
 class CurriculumCfg:
     """Curriculum terms for the MDP."""
-
     lin_vel_cmd_levels = CurrTerm(mdp.lin_vel_cmd_levels)
-    ang_vel_cmd_levels = CurrTerm(mdp.ang_vel_cmd_levels)
+    # Schedule the periodic event interval over training steps.
+    # Example: start relaxed (5s), then 3s, finally 2s.
+    # periodic_event_interval = CurrTerm(
+    #     func=mdp.modify_term_cfg,
+    #     params={
+    #         "address": "events.periodic_cart_reset.interval_range_s",
+    #         "modify_fn": mdp.schedule_event_interval,
+    #         "modify_params": {
+    #             "schedule": [
+    #                 (0, (2.0, 2.0)),
+    #                 (10000, (4.0, 4.0)),
+    #                 (30000, (8.0, 8.0)),
+    #             ]
+    #         },
+    #     },
+    # )
 
 ##
 # Environment configuration
@@ -274,7 +304,7 @@ class BabylocoformerEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 0.005
         self.sim.render_interval = self.decimation
         self.sim.physics_material = self.scene.terrain.physics_material
-        self.scene.terrain.max_init_terrain_level = 3
+        self.scene.terrain.max_init_terrain_level = self.scene.terrain.terrain_generator.num_rows - 1
 
         self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15
 
@@ -294,19 +324,19 @@ class BabylocoformerEnvCfg(ManagerBasedRLEnvCfg):
 @configclass
 class RobotPlayEnvCfg(BabylocoformerEnvCfg):
     lin_vel_x_range = (-1.0, 1.0)
-    lin_vel_y_range = (-0.0, 0.0)
-    ang_vel_z_range = (-0.3, 0.3)
+    lin_vel_y_range = (-0.1, 0.1)
+    ang_vel_z_range = (-0.6, 0.6)
 
     def __post_init__(self):
         super().__post_init__()
         self.scene.num_envs = 32
         self.scene.terrain.terrain_generator.num_rows = 10
         self.scene.terrain.max_init_terrain_level = self.scene.terrain.terrain_generator.num_rows - 1
-        self.scene.terrain.terrain_generator.curriculum = False
-        self.scene.terrain.terrain_generator.difficulty_range = (0.9, 1.0)
+        # self.scene.terrain.terrain_generator.curriculum = False
+        # self.scene.terrain.terrain_generator.difficulty_range = (0.1, 1.0)
         self.scene.terrain.terrain_generator.num_cols = 1
-        print(self.ang_vel_z_range)
-        print("="*20)
+        # print(self.ang_vel_z_range)
+        # print("="*20)
         self.commands.base_velocity.ranges = mdp.UniformLevelVelocityCommandCfg.Ranges(
             lin_vel_x=self.lin_vel_x_range,
             lin_vel_y=self.lin_vel_y_range,
