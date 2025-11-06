@@ -60,6 +60,29 @@ class compute_nominal_heights(ManagerTermBase):
 
             buffer[env_id] = nominal_height
 
+        # Also update the default root state's z so generic reset uses it.
+        if asset.data.default_root_state is not None:
+            # clone-assign only the z column
+            default_rs = asset.data.default_root_state
+            default_rs[indices, 2] = buffer[indices]
+
+        # Debug print (once at startup) to verify heights are applied.
+        # try:
+        #     bh = buffer[indices].detach().cpu()
+        #     dz = (
+        #         default_rs[indices, 2].detach().cpu() - bh
+        #         if asset.data.default_root_state is not None
+        #         else torch.zeros_like(bh)
+        #     )
+        #     msg = (
+        #         f"[babylocoformer] nominal_heights per-env: min={bh.min().item():.3f}, max={bh.max().item():.3f}; "
+        #         f"max|default_z - nominal|={dz.abs().max().item():.6f}. Samples: "
+        #         f"{bh[:8].tolist()}"
+        #     )
+        #     print(msg)
+        # except Exception:
+        #     pass
+
     @staticmethod
     def _normalize_env_ids(
         env: ManagerBasedEnv, env_ids: torch.Tensor | Sequence[int] | None
@@ -119,3 +142,83 @@ class compute_nominal_heights(ManagerTermBase):
         else:
             env._nominal_heights = env._nominal_heights.to(device=env.device, dtype=dtype)
         return env._nominal_heights
+
+
+# def nominal_height_obs(env: ManagerBasedEnv) -> torch.Tensor:
+#     """Return cached nominal heights as a single-scalar observation per env.
+
+#     Assumes :class:`compute_nominal_heights` was executed at startup. When the
+#     buffer is not available, returns zeros to avoid breaking the pipeline.
+#     """
+#     if not hasattr(env, "_nominal_heights") or env._nominal_heights is None:
+#         return torch.zeros((env.num_envs, 1), device=env.device)
+#     return env._nominal_heights.reshape(-1, 1)
+
+
+# def set_root_z_to_nominal(
+#     env: ManagerBasedEnv,
+#     env_ids: torch.Tensor | Sequence[int] | None,
+#     z_offset: float = 0.0,
+#     z_noise_range: tuple[float, float] = (0.0, 0.0),
+#     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+# ):
+#     """Set base height to nominal (+ offset + noise) per environment.
+
+#     Use as a reset event after position/orientation randomization to ensure each
+#     morphology starts at a consistent, feasible height.
+#     """
+#     asset = env.scene[asset_cfg.name]
+#     # normalize env ids
+#     if env_ids is None:
+#         env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long)
+#     elif not isinstance(env_ids, torch.Tensor):
+#         env_ids = torch.as_tensor(list(env_ids), device=env.device, dtype=torch.long)
+
+#     pos = asset.data.root_pos_w[env_ids].clone()
+#     quat = asset.data.root_quat_w[env_ids].clone()
+
+#     if hasattr(env, "_nominal_heights") and env._nominal_heights is not None:
+#         nominal = env._nominal_heights[env_ids]
+#     else:
+#         nominal = pos[:, 2]
+
+#     lo, hi = z_noise_range
+#     if hi != 0.0 or lo != 0.0:
+#         noise = torch.empty_like(nominal).uniform_(lo, hi)
+#     else:
+#         noise = torch.zeros_like(nominal)
+
+#     pos[:, 2] = nominal + float(z_offset) + noise
+#     asset.write_root_pose_to_sim(torch.cat([pos, quat], dim=-1), env_ids=env_ids)
+
+
+def randomize_joint_pd_gains(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor | Sequence[int] | None,
+    stiffness_scale_range: tuple[float, float] = (0.8, 1.2),
+    damping_scale_range: tuple[float, float] = (0.8, 1.2),
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", joint_names=".*"),
+):
+    """Randomly scale joint PD gains at reset.
+
+    Multiplies current PhysX DOF stiffness/damping by a per-env scalar sampled
+    uniformly from the given ranges. Works regardless of actuator type.
+    """
+    asset = env.scene[asset_cfg.name]
+
+    # normalize env ids
+    if env_ids is None:
+        env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long)
+    elif not isinstance(env_ids, torch.Tensor):
+        env_ids = torch.as_tensor(list(env_ids), device=env.device, dtype=torch.long)
+
+    joint_ids = asset_cfg.joint_ids if getattr(asset_cfg, "joint_ids", None) else slice(None)
+
+    k = asset.data.joint_stiffness[env_ids][:, joint_ids]
+    d = asset.data.joint_damping[env_ids][:, joint_ids]
+
+    ks = torch.empty((len(env_ids), 1), device=asset.device).uniform_(*stiffness_scale_range)
+    ds = torch.empty((len(env_ids), 1), device=asset.device).uniform_(*damping_scale_range)
+
+    asset.write_joint_stiffness_to_sim(k * ks, joint_ids=joint_ids, env_ids=env_ids)
+    asset.write_joint_damping_to_sim(d * ds, joint_ids=joint_ids, env_ids=env_ids)

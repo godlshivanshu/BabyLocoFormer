@@ -16,7 +16,7 @@ from babylocoformer.assets.unitree import unitree_actuators
 from pathlib import Path
 current_file = Path(__file__).resolve()
 project_root = current_file.parents[4]  
-base_dir = project_root / "model" / "test_usds"
+base_dir = project_root / "model" / "usds"
 print(base_dir)
 usd_path = [
     path for path in glob.glob(os.path.join(base_dir, "**", "*.usd"), recursive=True)

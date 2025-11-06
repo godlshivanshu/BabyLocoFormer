@@ -128,7 +128,7 @@ class ActionsCfg:
     """Action specifications for the MDP."""
 
     JointPositionAction = mdp.JointPositionActionCfg(
-        asset_name="robot", joint_names=[".*"], scale=0.25, use_default_offset=True, clip={".*": (-100.0, 100.0)}
+        asset_name="robot", joint_names=[".*"], scale=0.15, use_default_offset=True, clip={".*": (-100.0, 100.0)}
     )
 
 
@@ -189,7 +189,7 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # (1) Constant running reward
-    alive = RewTerm(func=mdp.is_alive, weight=5)
+    alive = RewTerm(func=mdp.is_alive, weight=4)
 
     # -- task
     track_lin_vel_xy = RewTerm(
@@ -202,8 +202,8 @@ class RewardsCfg:
     # -- base
     # reduce vertical-velocity penalty so the robot can lift COM when stepping
     base_linear_velocity = RewTerm(func=mdp.lin_vel_z_l2, weight=-2.0)
-    base_angular_velocity = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.05)
-    joint_acc = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
+    base_angular_velocity = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.005)
+    joint_acc = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-8)
     joint_torques = RewTerm(func=mdp.joint_torques_l2, weight=-2e-4)
     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.05)
     dof_pos_limits = RewTerm(func=mdp.joint_pos_limits, weight=-10.0)
@@ -247,10 +247,10 @@ class TerminationsCfg:
     # (1) Time out
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
 
-    bad_orientation = DoneTerm(func=mdp.bad_orientation, params={"limit_angle": 1.2})
+    bad_orientation = DoneTerm(func=mdp.bad_orientation, params={"limit_angle": 1.0})
     base_contact = DoneTerm(
         func=mdp.illegal_contact,
-        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names="base"), "threshold": 1.0},
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base",".*_hip"]), "threshold": 1.0},
     )
 
 
@@ -258,22 +258,19 @@ class TerminationsCfg:
 class CurriculumCfg:
     """Curriculum terms for the MDP."""
     lin_vel_cmd_levels = CurrTerm(mdp.lin_vel_cmd_levels)
-    # Schedule the periodic event interval over training steps.
-    # Example: start relaxed (5s), then 3s, finally 2s.
-    # periodic_event_interval = CurrTerm(
-    #     func=mdp.modify_term_cfg,
-    #     params={
-    #         "address": "events.periodic_cart_reset.interval_range_s",
-    #         "modify_fn": mdp.schedule_event_interval,
-    #         "modify_params": {
-    #             "schedule": [
-    #                 (0, (2.0, 2.0)),
-    #                 (10000, (4.0, 4.0)),
-    #                 (30000, (8.0, 8.0)),
-    #             ]
-    #         },
-    #     },
-    # )
+    episode_length_s = CurrTerm(
+        func=mdp.schedule_episode_length,
+        params={
+            "schedule": [
+                (0, 2.0),
+                (300, 4.0),
+                (500, 6.0),
+                (700, 8.0),
+                (1000, 15.0),
+            ]
+        },
+    )
+
 
 ##
 # Environment configuration

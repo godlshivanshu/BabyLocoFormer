@@ -21,8 +21,8 @@ class EventCfg:
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
             "segments": [
-                {"body": "RL_thigh", "geometry_path": "collisions/mesh_0/cylinder", "multiplier": 0.75},
-                {"body": "RL_calf", "geometry_path": "collisions/mesh_0/cylinder", "multiplier": 0.95},
+                {"body": "RL_thigh", "geometry_path": "collisions/mesh_0/cylinder", "multiplier": 0.8},
+                {"body": "RL_calf", "geometry_path": "collisions/mesh_0/cylinder", "multiplier": 0.8},
             ],
         },
     )
@@ -32,8 +32,8 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
-            "static_friction_range": (0.3, 1.2),
-            "dynamic_friction_range": (0.3, 1.2),
+            "static_friction_range": (0.5, 1.2),
+            "dynamic_friction_range": (0.5, 1.2),
             "restitution_range": (0.0, 0.15),
             "num_buckets": 64,
         },
@@ -128,6 +128,27 @@ class EventCfg:
         },
     )
 
+    # # Set per-morphology nominal starting height (after the generic reset above)
+    # set_base_height_nominal = EventTerm(
+    #     func=mdp.set_root_z_to_nominal,
+    #     mode="reset",
+    #     params={
+    #         "z_offset": 0.0,
+    #         "z_noise_range": (-0.01, 0.01),
+    #     },
+    # )
+
+    # # Randomize PD gains to encourage adaptation from short history
+    # randomize_pd_gains = EventTerm(
+    #     func=mdp.randomize_joint_pd_gains,
+    #     mode="reset",
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
+    #         "stiffness_scale_range": (0.8, 1.2),
+    #         "damping_scale_range": (0.8, 1.2),
+    #     },
+    # )
+
     reset_robot_joints = EventTerm(
         func=mdp.reset_joints_by_scale,
         mode="reset",
@@ -148,25 +169,24 @@ class EventCfg:
     # periodic reset of the robot state without terminating the episode
     # this is useful for continuous data collection where the robot is reset to a new state
     # without ending the MDP.
-    periodic_cart_reset = EventTerm(
-        func=mdp.reset_joints_by_offset,
-        mode="interval",
-        interval_range_s=(2.0, 2.1),  # reset every 2 seconds
-        is_global_time=False,
-        params={
-            # Apply to the quadruped's default leg joints (matching init_state patterns)
-            "asset_cfg": SceneEntityCfg(
-                "robot",
-                joint_names=[
-                    ".*R_hip_joint",
-                    ".*L_hip_joint",
-                    "F[L,R]_thigh_joint",
-                    "R[L,R]_thigh_joint",
-                    ".*_calf_joint",
-                ],
-            ),
-            "position_range": (-0.0, 0.0),
-            "velocity_range": (-0.0, 0.0),
-        },
-    )
-
+    # periodic_cart_reset = EventTerm(
+    #     func=mdp.reset_joints_by_offset,
+    #     mode="interval",
+    #     interval_range_s=(2.0, 2.1),  # reset every 2 seconds
+    #     is_global_time=False,
+    #     params={
+    #         # Apply to the quadruped's default leg joints (matching init_state patterns)
+    #         "asset_cfg": SceneEntityCfg(
+    #             "robot",
+    #             joint_names=[
+    #                 ".*R_hip_joint",
+    #                 ".*L_hip_joint",
+    #                 "F[L,R]_thigh_joint",
+    #                 "R[L,R]_thigh_joint",
+    #                 ".*_calf_joint",
+    #             ],
+    #         ),
+    #         "position_range": (-0.0, 0.0),
+    #         "velocity_range": (-0.0, 0.0),
+    #     },
+    # )

@@ -64,41 +64,19 @@ def ang_vel_cmd_levels(
     return torch.tensor(ranges.ang_vel_z[1], device=env.device)
 
 
-# def schedule_event_interval(
-#     env,
-#     env_ids,
-#     current_value: tuple[float, float] | list[float],
-#     schedule: list[tuple[int, tuple[float, float]]],
-# ) -> tuple[float, float] | object:
-#     """Step-based schedule to update an event's interval_range_s.
+def schedule_episode_length(
+    env: ManagerBasedRLEnv,
+    env_ids: Sequence[int],
+    schedule: list[tuple[int, float]]
+) -> None:
+    """Schedules the episode length over training iterations.
 
-#     Args:
-#         env: The RL environment.
-#         env_ids: Sub-env indices (unused; for signature compatibility).
-#         current_value: The current interval tuple, e.g., (2.0, 2.0).
-#         schedule: List of (step_threshold, (lo, hi)) sorted by step. The last entry with
-#             step_threshold <= env.common_step_counter becomes the new target.
+    The schedule is a list of tuples, where each tuple contains the number of training iterations and the
+    corresponding episode length in seconds.
+    """
+    # check if runner is available before using it
+    for iterations, length_s in schedule:
+        if hasattr(env, "runner") and env.runner is not None:
+            if env.runner.current_learning_iteration >= iterations:
+                env.cfg.episode_length_s = length_s
 
-#     Returns:
-#         - New (lo, hi) tuple if it changes at this step.
-#         - mdp.modify_env_param.NO_CHANGE when no update is needed.
-#     """
-#     # ensure schedule is sorted by step
-#     schedule = sorted(schedule, key=lambda x: x[0])
-#     step = getattr(env, "common_step_counter", 0)
-#     target = None
-#     for s, val in schedule:
-#         if step >= s:
-#             target = val
-#         else:
-#             break
-
-#     if target is None:
-#         return modify_env_param.NO_CHANGE  # no change before first threshold
-
-#     # avoid redundant sets
-#     cur = tuple(current_value) if isinstance(current_value, (list, tuple)) else current_value
-#     if isinstance(cur, tuple) and cur == tuple(target):
-#         return modify_env_param.NO_CHANGE
-
-#     return tuple(target)
