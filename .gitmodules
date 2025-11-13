@@ -1,0 +1,3 @@
+[submodule "rsl_rl"]
+	path = rsl_rl
+	url = https://github.com/linden713/rsl_rl_transformer_xl.git
