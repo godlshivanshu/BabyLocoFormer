@@ -15,7 +15,8 @@ BabyLocoFormer is an open-source unofficial baby version of LocoFormer. It inclu
 - Using a python interpreter that has Isaac Lab installed, install the library in editable mode using:
 
     ```bash
-    python -m pip install -e source/babylocoformer
+    pip install -e source/babylocoformer
+    cd rsl_rl && pip install -e .
     ```
 
 ## Usage

@@ -74,3 +74,4 @@ usds
 test*
 __pycache__
 backup
+.vscode
