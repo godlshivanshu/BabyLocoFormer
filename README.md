@@ -46,13 +46,8 @@ python scripts/rsl_rl/play.py --task=Unitree-Go2-Velocity
 
 ## Results
 
-Play:
-
-<p align="center"> <img src="docs/results/babylocoformer_walk.gif" width="400"> <img src="docs/results/babylocoformer_jump.gif" width="400"> </p>
-
-Zero shot on Unitree Go2:
-
-Adaption? by locking knee joints.
+[![Demo(Bilibili)](https://img.shields.io/badge/Demo-ff69b4?style=for-the-badge&logo=bilibili)](https://www.bilibili.com/video/BV14xCsB9EoY/?share_source=copy_web&vd_source=0de36dd681c4f7ffab776ec97939e21f)
+[![Demo(YouTube)](https://img.shields.io/badge/Demo-FF0000?style=for-the-badge&logo=youtube)](https://youtu.be/7WqCCVZDSJo)
 
 ## 🌟 Contribute & Support
 If you find this project useful or interesting, please consider **starring ⭐ this repository**!
@@ -66,7 +61,7 @@ To install pre-commit and run:
 ```bash
 pip install pre-commit
 
-pre-commit run --all-files
+pre-commit run --files <path/to/file>
 ```
 ### Some final thoughts
 More robot morphologies help stabilize training, and stronger randomization improves adaptation, which makes sense.
